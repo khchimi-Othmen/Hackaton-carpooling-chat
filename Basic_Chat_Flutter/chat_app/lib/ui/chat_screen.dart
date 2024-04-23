@@ -1,4 +1,11 @@
+import 'dart:io';
+
+import 'package:chat_app/controller/chat_controller.dart';
+import 'package:chat_app/model/message.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -11,7 +18,34 @@ class _ChatScreenState extends State<ChatScreen> {
   Color purple = Color(0xFF6c5ce7);
   Color black = Color(0xFF191919);
   TextEditingController msgInputController = TextEditingController();
+  late IO.Socket socket;
+
+
+ChatController chatController = ChatController();
+
+@override
+void initState() {
   
+// Example of initializing socket connection
+socket = IO.io(
+  'http://localhost:4000',
+  IO.OptionBuilder()
+    .setTransports(['websocket']) // for Flutter or Dart VM
+    .disableAutoConnect()  // disable auto-connection
+    .build());
+
+socket.connect();
+
+// Print connection status
+socket.onConnect((_) {
+  print('Connected to server');
+});
+
+socket.onConnectError((error) {
+  print('Connection error: $error');
+});
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -21,13 +55,29 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           children: [
             Expanded(
+              child: Obx(
+                ()=>Container(
+                  padding: EdgeInsets.all(10),
+                  child: Text(
+                   "Connected User ${chatController.connectedUser}",
+                  style:TextStyle(
+                  color: Colors.white,
+                  fontSize: 15.0,
+                   ),
+                ),
+                ),
+            ),
+            ),
+            Expanded(
               flex: 9,
-              child: Container(
-                child: ListView.builder(
-                    itemCount: 10,
+              child: Obx(
+                ()=> ListView.builder(
+                    itemCount: chatController.chatMessages.length,
                     itemBuilder: (context, index) {
+                      var currentItem = chatController.chatMessages[index];
                       return MessageItem(
-                        sendByMe: false,
+                        sentByMe: currentItem.sentByMe == socket.id,
+                        message: currentItem.message,
                       );
                     }),
               ),
@@ -76,11 +126,37 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+
+
+void sendMessage(String text) {
+  var messageJson ={
+    "message": text,
+    "sentByMe": socket.id
+  };
+  socket.emit('message', messageJson);
+    chatController.chatMessages.add(Message.fromJson(messageJson));
 }
 
+void setUpSocketListener (){
+  socket.on('message-recieve',(data) {
+    print(data);
+    chatController.chatMessages.add(Message.fromJson(data));
+  });
+    socket.on('connected-user',(data) {
+    print(data);
+    chatController.connectedUser.value = data;
+  }); 
+}
+}
+
+
+
+
+
 class MessageItem extends StatelessWidget {
-  const MessageItem({Key? key, required this.sendByMe}) : super(key: key);
-  final bool sendByMe;
+  const  MessageItem({Key? key, required this.sentByMe, required this.message}) : super(key: key);
+  final bool sentByMe;
+  final String message;
   @override
   Widget build(BuildContext context) {
     Color purple = Color(0xFF6c5ce7);
@@ -88,7 +164,7 @@ class MessageItem extends StatelessWidget {
     Color white = Colors.white;
 
     return Align(
-        alignment: sendByMe ? Alignment.centerRight : Alignment.centerLeft,
+        alignment: sentByMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
             padding: EdgeInsets.symmetric(
               vertical: 5,
@@ -100,23 +176,24 @@ class MessageItem extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              color: sendByMe ? purple : white,
+              color: sentByMe ? purple : white,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text("Hello",
+                Text(
+                  message,
                     style: TextStyle(
-                      color: sendByMe ? white : purple,
+                      color: sentByMe ? white : purple,
                       fontSize: 18,
                     )),
                 SizedBox(width: 5),
                 Text(
                   "1:10 Am",
                   style: TextStyle(
-                    color: (sendByMe ? white : purple).withOpacity(0.7),
+                    color: (sentByMe ? white : purple).withOpacity(0.7),
                     fontSize: 10,
                   ),
                 ),
@@ -125,4 +202,3 @@ class MessageItem extends StatelessWidget {
   }
 }
 
-void sendMessage(String text) {}
