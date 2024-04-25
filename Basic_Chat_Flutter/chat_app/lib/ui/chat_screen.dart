@@ -37,9 +37,10 @@ socket = IO.io(
 socket.connect();
 
 // Print connection status
-socket.onConnect((_) {
-  print('Connected to server');
-});
+  socket.onConnect((_) {
+    print('Connected to server');
+    setUpSocketListener(); // Call the listener function here
+  });
 
 socket.onConnectError((error) {
   print('Connection error: $error');
