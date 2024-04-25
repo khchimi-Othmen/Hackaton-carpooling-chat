@@ -1,10 +1,17 @@
 
 // console.log('working22');
 const express = require('express');
+const mongoose = require("mongoose");
+const Message = require("./entities/message")
 
 const app = express();
 
+
+
 const PORT = process.env.PORT || 4000
+
+
+mongoose.connect('mongodb+srv://maryemtayeb:OdmDnK0czdgksPQB@cluster0.w0lp418.mongodb.net/test').then(()=>console.log("connected to database"));
 const server = app.listen(PORT,()=>{
         console.log('Server is Stated on',PORT);
 });
@@ -27,8 +34,13 @@ io.on('connection', (socket) => {
 
     });
   
-    socket.on('message', (data) => {
-      console.log(data);
+    socket.on('message', async (data) => {
+      const {message, sentByMe} = data;
+      
+      const newMessage = await Message.create({
+        message,
+        sentByMe
+      })
       socket.broadcast.emit('message-recieve',data)
     });
   });
